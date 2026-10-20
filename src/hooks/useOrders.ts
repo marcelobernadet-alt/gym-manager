@@ -9,8 +9,8 @@ export function useOrders(opts: { clientId?: string; all?: boolean } = {}) {
   const refresh = useCallback(async () => {
     setLoading(true);
     let query = supabase
-      .from('orders')
-      .select('*, order_items(*, products(*)), profiles!orders_client_id_fkey(*)')
+      .from('gm_orders')
+      .select('*, order_items:gm_order_items(*, products:gm_products(*)), profiles:gm_profiles!gm_orders_client_id_fkey(*)')
       .order('created_at', { ascending: false });
     if (!opts.all && opts.clientId) query = query.eq('client_id', opts.clientId);
     const { data, error } = await query;
@@ -31,7 +31,7 @@ export function useOrders(opts: { clientId?: string; all?: boolean } = {}) {
     notes?: string
   ) => {
     const items = cart.map((l) => ({ product_id: l.product.id, quantity: l.quantity }));
-    const { data, error } = await supabase.rpc('create_order', {
+    const { data, error } = await supabase.rpc('gm_create_order', {
       p_items: items,
       p_client_id: clientId,
       p_payment_method: paymentMethod,

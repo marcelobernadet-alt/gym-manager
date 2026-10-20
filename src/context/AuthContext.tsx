@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // so the very first load can race it — retry briefly instead of giving up.
     for (let attempt = 0; attempt < 5; attempt++) {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('gm_profiles')
         .select('*')
         .eq('auth_user_id', userId)
         .maybeSingle();

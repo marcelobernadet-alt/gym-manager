@@ -18,7 +18,7 @@ export const ClientProfile: React.FC = () => {
   const handleSave = async () => {
     if (!profile) return;
     setSaving(true);
-    await supabase.from('profiles').update({ full_name: fullName, phone }).eq('id', profile.id);
+    await supabase.from('gm_profiles').update({ full_name: fullName, phone }).eq('id', profile.id);
     await refreshProfile();
     setSaving(false);
     setEditing(false);

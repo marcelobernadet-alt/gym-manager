@@ -7,7 +7,7 @@ export function useGymClasses() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase.from('gym_classes').select('*').order('name');
+    const { data, error } = await supabase.from('gm_classes').select('*').order('name');
     if (error) console.error(error);
     setClasses((data as GymClass[]) ?? []);
     setLoading(false);
@@ -18,19 +18,19 @@ export function useGymClasses() {
   }, [refresh]);
 
   const createClass = async (input: Omit<GymClass, 'id' | 'created_at'>) => {
-    const { error } = await supabase.from('gym_classes').insert(input);
+    const { error } = await supabase.from('gm_classes').insert(input);
     if (error) throw error;
     await refresh();
   };
 
   const updateClass = async (id: string, input: Partial<GymClass>) => {
-    const { error } = await supabase.from('gym_classes').update(input).eq('id', id);
+    const { error } = await supabase.from('gm_classes').update(input).eq('id', id);
     if (error) throw error;
     await refresh();
   };
 
   const deleteClass = async (id: string) => {
-    const { error } = await supabase.from('gym_classes').delete().eq('id', id);
+    const { error } = await supabase.from('gm_classes').delete().eq('id', id);
     if (error) throw error;
     await refresh();
   };
@@ -46,8 +46,8 @@ export function useClassSessions(from: Date, to: Date) {
   const refresh = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('class_sessions')
-      .select('*, gym_classes(*), bookings!left(count)')
+      .from('gm_class_sessions')
+      .select('*, gym_classes:gm_classes(*), bookings:gm_bookings!left(count)')
       .eq('bookings.status', 'booked')
       .gte('start_time', from.toISOString())
       .lt('start_time', to.toISOString())
@@ -73,13 +73,13 @@ export function useClassSessions(from: Date, to: Date) {
   }, [refresh]);
 
   const createSession = async (input: Omit<ClassSession, 'id' | 'created_at' | 'gym_classes' | 'booked_count'>) => {
-    const { error } = await supabase.from('class_sessions').insert(input);
+    const { error } = await supabase.from('gm_class_sessions').insert(input);
     if (error) throw error;
     await refresh();
   };
 
   const deleteSession = async (id: string) => {
-    const { error } = await supabase.from('class_sessions').delete().eq('id', id);
+    const { error } = await supabase.from('gm_class_sessions').delete().eq('id', id);
     if (error) throw error;
     await refresh();
   };

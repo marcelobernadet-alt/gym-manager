@@ -14,8 +14,8 @@ export function useMembers() {
   const refresh = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*, memberships(*)')
+      .from('gm_profiles')
+      .select('*, memberships:gm_memberships(*)')
       .eq('role', 'client')
       .order('created_at', { ascending: false });
     if (error) console.error(error);
@@ -38,14 +38,14 @@ export function useMembers() {
     plan_price?: number;
   }) => {
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
+      .from('gm_profiles')
       .insert({ full_name: input.full_name, email: input.email, phone: input.phone ?? null, role: 'client' })
       .select()
       .single();
     if (profileError) throw profileError;
 
     if (input.plan_name) {
-      const { error: membershipError } = await supabase.from('memberships').insert({
+      const { error: membershipError } = await supabase.from('gm_memberships').insert({
         client_id: profile.id,
         plan_name: input.plan_name,
         price: input.plan_price ?? 0
@@ -58,19 +58,19 @@ export function useMembers() {
   };
 
   const updateMember = async (id: string, input: Partial<Profile>) => {
-    const { error } = await supabase.from('profiles').update(input).eq('id', id);
+    const { error } = await supabase.from('gm_profiles').update(input).eq('id', id);
     if (error) throw error;
     await refresh();
   };
 
   const addMembership = async (clientId: string, input: Omit<Membership, 'id' | 'client_id' | 'created_at'>) => {
-    const { error } = await supabase.from('memberships').insert({ ...input, client_id: clientId });
+    const { error } = await supabase.from('gm_memberships').insert({ ...input, client_id: clientId });
     if (error) throw error;
     await refresh();
   };
 
   const updateMembership = async (id: string, input: Partial<Membership>) => {
-    const { error } = await supabase.from('memberships').update(input).eq('id', id);
+    const { error } = await supabase.from('gm_memberships').update(input).eq('id', id);
     if (error) throw error;
     await refresh();
   };

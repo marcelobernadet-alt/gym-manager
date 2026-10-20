@@ -14,8 +14,8 @@ export function useMyBookings(clientId: string | undefined) {
     }
     setLoading(true);
     const { data, error } = await supabase
-      .from('bookings')
-      .select('*, class_sessions(*, gym_classes(*))')
+      .from('gm_bookings')
+      .select('*, class_sessions:gm_class_sessions(*, gym_classes:gm_classes(*))')
       .eq('client_id', clientId)
       .eq('status', 'booked')
       .order('created_at', { ascending: false });
@@ -30,13 +30,13 @@ export function useMyBookings(clientId: string | undefined) {
 
   const book = async (sessionId: string) => {
     if (!clientId) throw new Error('No hay usuario autenticado');
-    const { error } = await supabase.from('bookings').insert({ session_id: sessionId, client_id: clientId });
+    const { error } = await supabase.from('gm_bookings').insert({ session_id: sessionId, client_id: clientId });
     if (error) throw error;
     await refresh();
   };
 
   const cancel = async (bookingId: string) => {
-    const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+    const { error } = await supabase.from('gm_bookings').update({ status: 'cancelled' }).eq('id', bookingId);
     if (error) throw error;
     await refresh();
   };

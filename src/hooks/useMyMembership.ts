@@ -12,7 +12,7 @@ export function useMyMembership(clientId: string | undefined) {
       return;
     }
     supabase
-      .from('memberships')
+      .from('gm_memberships')
       .select('*')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })

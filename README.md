@@ -6,35 +6,35 @@ App web + móvil para la gestión de un gimnasio: reservas de clases, tienda onl
 - **Backend:** Supabase (Postgres + Auth con Google OAuth + Row Level Security)
 - **Móvil:** Capacitor (empaqueta la misma web app como app nativa iOS/Android)
 
-## 1. Crear el proyecto en Supabase
+## 1. Base de datos en Supabase
 
-1. Entrá a [supabase.com](https://supabase.com) y creá un proyecto nuevo (plan gratuito alcanza para empezar).
-2. En **Project Settings → API** copiá la `Project URL` y la `anon public key`.
-3. En **SQL Editor**, ejecutá en orden el contenido de:
-   - `supabase/migrations/0001_init.sql`
-   - `supabase/migrations/0002_create_order_rpc.sql`
+Esta app vive en el **mismo proyecto Supabase** que ya usás (`vidafit-training`, el de TrainFlow) — no hace falta crear uno nuevo. Para que las dos apps no choquen entre sí, **todo el esquema de Gym Manager usa el prefijo `gm_`**: `gm_profiles`, `gm_memberships`, `gm_classes`, `gm_class_sessions`, `gm_bookings`, `gm_products`, `gm_orders`, `gm_order_items`, y las funciones `gm_current_profile_id`, `gm_is_current_owner`, `gm_create_order`. El trigger que crea el perfil al iniciar sesión (`gm_on_auth_user_created`) se agregó **además** del que ya tenía TrainFlow en `auth.users`, sin tocarlo.
 
-   Esto crea todas las tablas (`profiles`, `memberships`, `gym_classes`, `class_sessions`, `bookings`, `products`, `orders`, `order_items`), las políticas de seguridad (RLS) y el trigger que crea el perfil de cada usuario automáticamente.
+Ya está todo aplicado (tablas, RLS, el trigger y la función de checkout atómico `gm_create_order`). Si alguna vez necesitás recrearlo desde cero en otro proyecto, los mismos scripts están en:
+- `supabase/migrations/0001_init.sql`
+- `supabase/migrations/0002_create_order_rpc.sql`
+
+(se ejecutaron igual, solo que statement por statement vía el MCP de Supabase en vez de pegados todos juntos en el SQL Editor — si los corrés ahí de una sola vez también funcionan).
 
 ### Habilitar login con Google
 
-1. En Supabase: **Authentication → Providers → Google**, activalo.
+Esto es lo único que falta y requiere tu propia cuenta de Google (nadie más puede hacerlo por vos):
+
+1. En el dashboard de Supabase del proyecto **vidafit-training**: **Authentication → Providers → Google**, activalo.
 2. Necesitás un **Client ID** y **Client Secret** de Google. Se generan en [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
    - Creá credenciales OAuth 2.0 tipo "Web application".
-   - En **Authorized redirect URIs** agregá la URL que te muestra Supabase en esa misma pantalla (termina en `/auth/v1/callback`).
+   - En **Authorized redirect URIs** agregá la URL que te muestra Supabase en esa misma pantalla (termina en `/auth/v1/callback`). Va a ser la misma URL que ya usa TrainFlow, así que si ese provider ya está configurado con Google ahí, podés reusar las mismas credenciales.
 3. Pegá el Client ID y Secret en Supabase y guardá.
-4. En **Authentication → URL Configuration**, agregá la URL donde corre tu app (ej. `http://localhost:5173` en desarrollo, y tu dominio en producción) a **Site URL** y **Redirect URLs**.
+4. En **Authentication → URL Configuration**, agregá la URL donde corre esta app (ej. `http://localhost:5173` en desarrollo, y tu dominio en producción) a **Site URL** y **Redirect URLs**.
 
-### Convertirte en owner
+### Tu cuenta ya es owner
 
-Por defecto, todos los que inician sesión quedan con rol `client`. Para que tu propia cuenta sea la del dueño del gimnasio:
+Ya dejé tu perfil (`marcelobernadet@gmail.com`) precargado en `gm_profiles` con `role = 'owner'`. En cuanto habilites Google (paso anterior) e inicies sesión con esa cuenta, el trigger vincula tu login a ese perfil automáticamente y entrás directo a la pantalla de Owner — no hace falta ningún UPDATE manual.
 
-1. Iniciá sesión una vez en la app con tu cuenta de Google (vas a quedar como cliente).
-2. En el SQL Editor de Supabase, corré:
-   ```sql
-   update profiles set role = 'owner' where lower(email) = lower('tu-email@gmail.com');
-   ```
-3. Recargá la app — ahora vas a ver la pantalla de Owner (Venta / Gestión).
+Para dar de alta a cualquier otra persona como owner más adelante:
+```sql
+update gm_profiles set role = 'owner' where lower(email) = lower('otro-email@gmail.com');
+```
 
 ## 2. Configurar el proyecto localmente
 
@@ -43,11 +43,11 @@ npm install
 cp .env.example .env
 ```
 
-Completá `.env` con los valores de tu proyecto Supabase:
+Completá `.env` con los valores del proyecto `vidafit-training` (Project Settings → API en el dashboard de Supabase):
 
 ```
-VITE_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=tu-anon-key
+VITE_SUPABASE_URL=https://ybugyraezxstzsngsvum.supabase.co
+VITE_SUPABASE_ANON_KEY=tu-publishable-key
 VITE_GYM_NAME=Nombre de tu gimnasio
 ```
 
@@ -68,9 +68,9 @@ supabase/migrations/          # esquema SQL + políticas de seguridad
 ```
 
 **Modelo de datos clave:**
-- `profiles` guarda tanto a clientes como al owner. Está desacoplado de la cuenta de Google (`auth_user_id`) para que el owner pueda **dar de alta un socio nuevo** (nombre, email, teléfono, plan) *antes* de que esa persona inicie sesión. Cuando el socio entra por primera vez con Google usando ese mismo email, su cuenta se vincula automáticamente a ese perfil.
-- `gym_classes` son las clases "molde" (ej: Spinning, Yoga) y `class_sessions` son los horarios concretos programados (día/hora/cupo). Los clientes reservan un lugar en una `class_session` (tabla `bookings`), con control de cupo.
-- `products`, `orders` y `order_items` cubren tanto las compras que hace un cliente desde la tienda online como las ventas que el owner carga manualmente desde el punto de venta (Venta → POS). Ambas pasan por la misma función `create_order` en la base, que descuenta stock de forma atómica.
+- `gm_profiles` guarda tanto a clientes como al owner. Está desacoplado de la cuenta de Google (`auth_user_id`) para que el owner pueda **dar de alta un socio nuevo** (nombre, email, teléfono, plan) *antes* de que esa persona inicie sesión. Cuando el socio entra por primera vez con Google usando ese mismo email, su cuenta se vincula automáticamente a ese perfil.
+- `gm_classes` son las clases "molde" (ej: Spinning, Yoga) y `gm_class_sessions` son los horarios concretos programados (día/hora/cupo). Los clientes reservan un lugar en una sesión (tabla `gm_bookings`), con control de cupo.
+- `gm_products`, `gm_orders` y `gm_order_items` cubren tanto las compras que hace un cliente desde la tienda online como las ventas que el owner carga manualmente desde el punto de venta (Venta → POS). Ambas pasan por la misma función `gm_create_order` en la base, que descuenta stock de forma atómica.
 
 ## 4. Extender la app
 

@@ -1,7 +1,7 @@
 -- Atomic order creation: validates stock, inserts the order + line items,
 -- and decrements stock in a single transaction so concurrent checkouts can't
--- oversell a product.
-create or replace function create_order(
+-- oversell a product. Prefixed gm_ like the rest of this app's schema.
+create or replace function gm_create_order(
   p_items jsonb, -- [{"product_id": "...", "quantity": 2}, ...]
   p_client_id uuid,
   p_payment_method text,
@@ -16,20 +16,20 @@ declare
   v_order_id uuid;
   v_total numeric(10, 2) := 0;
   v_item jsonb;
-  v_product products;
+  v_product gm_products;
   v_qty int;
-  v_created_by uuid := current_profile_id();
+  v_created_by uuid := gm_current_profile_id();
 begin
   if v_created_by is null then
     raise exception 'not authenticated';
   end if;
 
   -- Only the client themself, or the owner (in-person / assigned sale), may place this order.
-  if p_client_id is not null and p_client_id <> v_created_by and not is_owner(v_created_by) then
+  if p_client_id is not null and p_client_id <> v_created_by and not gm_is_current_owner() then
     raise exception 'not allowed';
   end if;
 
-  insert into orders (client_id, created_by, total, status, payment_method, source, notes)
+  insert into gm_orders (client_id, created_by, total, status, payment_method, source, notes)
   values (p_client_id, v_created_by, 0, 'paid', p_payment_method, p_source, p_notes)
   returning id into v_order_id;
 
@@ -40,7 +40,7 @@ begin
       raise exception 'invalid quantity';
     end if;
 
-    select * into v_product from products where id = (v_item ->> 'product_id')::uuid for update;
+    select * into v_product from gm_products where id = (v_item ->> 'product_id')::uuid for update;
     if v_product.id is null then
       raise exception 'product not found';
     end if;
@@ -48,18 +48,18 @@ begin
       raise exception 'insufficient stock for %', v_product.name;
     end if;
 
-    update products set stock = stock - v_qty where id = v_product.id;
+    update gm_products set stock = stock - v_qty where id = v_product.id;
 
-    insert into order_items (order_id, product_id, quantity, unit_price)
+    insert into gm_order_items (order_id, product_id, quantity, unit_price)
     values (v_order_id, v_product.id, v_qty, v_product.price);
 
     v_total := v_total + (v_product.price * v_qty);
   end loop;
 
-  update orders set total = v_total where id = v_order_id;
+  update gm_orders set total = v_total where id = v_order_id;
 
   return v_order_id;
 end;
 $$;
 
-grant execute on function create_order(jsonb, uuid, text, text, text) to authenticated;
+grant execute on function gm_create_order(jsonb, uuid, text, text, text) to authenticated;

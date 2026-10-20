@@ -8,7 +8,7 @@ export function useProducts(opts: { includeInactive?: boolean } = {}) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('products').select('*').order('name');
+    let query = supabase.from('gm_products').select('*').order('name');
     if (!opts.includeInactive) query = query.eq('is_active', true);
     const { data, error } = await query;
     if (error) console.error(error);
@@ -21,19 +21,19 @@ export function useProducts(opts: { includeInactive?: boolean } = {}) {
   }, [refresh]);
 
   const createProduct = async (input: Omit<Product, 'id' | 'created_at'>) => {
-    const { error } = await supabase.from('products').insert(input);
+    const { error } = await supabase.from('gm_products').insert(input);
     if (error) throw error;
     await refresh();
   };
 
   const updateProduct = async (id: string, input: Partial<Product>) => {
-    const { error } = await supabase.from('products').update(input).eq('id', id);
+    const { error } = await supabase.from('gm_products').update(input).eq('id', id);
     if (error) throw error;
     await refresh();
   };
 
   const deleteProduct = async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { error } = await supabase.from('gm_products').delete().eq('id', id);
     if (error) throw error;
     await refresh();
   };
